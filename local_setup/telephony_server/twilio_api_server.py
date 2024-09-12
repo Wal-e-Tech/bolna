@@ -65,12 +65,18 @@ async def make_call(request: Request):
         print(f'app_callback_url: {app_callback_url}')
         print(f'websocket_url: {websocket_url}')
 
+        webhook_url = call_details["webhook_url"] if "webhook_url" in call_details else ""
+        print(f'webhook_url : {webhook_url}')
+
         call = twilio_client.calls.create(
             to=call_details.get('recipient_phone_number'),
             from_=twilio_phone_number,
             url=f"{app_callback_url}/twilio_callback?ws_url={websocket_url}&agent_id={agent_id}&user_id={user_id}",
             method="POST",
-            record=False
+            record=False,
+            status_callback=webhook_url,
+            status_callback_method="POST",
+            status_callback_event=["completed"],
         )
 
         # persisting user details
