@@ -14,6 +14,7 @@ RUN pip install torchaudio==2.0.1
 RUN pip install pydub==0.25.1
 RUN pip install ffprobe
 RUN pip install aiofiles
+RUN pip install "litellm==1.10.2"
 
 EXPOSE 5001
 CMD ["uvicorn", "quickstart_server:app", "--host", "0.0.0.0", "--port", "5001"]
