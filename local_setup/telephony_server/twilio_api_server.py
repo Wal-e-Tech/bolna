@@ -1,13 +1,14 @@
+import logging
 import os
 import json
 import requests
 import uuid
-from twilio.twiml.voice_response import VoiceResponse, Connect
+from twilio.twiml.voice_response import VoiceResponse, Connect, Dial, Conference, Stream
 from twilio.rest import Client
 from dotenv import load_dotenv
 import redis.asyncio as redis
-from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import PlainTextResponse
+from fastapi import FastAPI, HTTPException, Query, Request, Form
+from fastapi.responses import PlainTextResponse, JSONResponse, Response
 
 app = FastAPI()
 load_dotenv()
@@ -105,3 +106,82 @@ async def twilio_callback(ws_url: str = Query(...), agent_id: str = Query(...), 
 
     except Exception as e:
         print(f"Exception occurred in twilio_callback: {e}")
+
+
+@app.post('/conference_call')
+async def make_call(request: Request):
+    try:
+        call_details = await request.json()
+        agent_id = call_details.get('agent_id')
+        phone_numbers = call_details.get('phone_numbers')
+        webhook_url = call_details.get("webhook_url", "")
+
+        if not agent_id:
+            raise HTTPException(status_code=400, detail="Agent ID not provided")
+
+        if not phone_numbers or len(phone_numbers) < 2:
+            raise HTTPException(status_code=400, detail="Two phone numbers must be provided")
+
+        # Generate a unique user ID
+        user_id = str(uuid.uuid4())
+        conference_name = f"MyConferenceRoom_{user_id}"
+        app_callback_url, websocket_url = populate_ngrok_tunnels()
+
+        print(f'app_callback_url: {app_callback_url}')
+        print(f'websocket_url: {websocket_url}')
+        print(f'webhook_url: {webhook_url}')
+        print(f'Generated conference name: {conference_name}')
+
+        # Define two participants: one speaker and one hear-only
+        participants = [
+            {'phone': phone_numbers[0], 'muted': False},  
+            {'phone': phone_numbers[1], 'muted': True},
+            # {'phone': twilio_phone_number, 'muted': False}    
+        ]
+
+        # Initiate calls for both participants and make them join the same conference
+        for participant in participants:
+            if participant['phone']:
+                call = twilio_client.calls.create(
+                    to=participant['phone'],
+                    from_=twilio_phone_number,
+                    url=f"{app_callback_url}/twilio_callback_conference?ws_url={websocket_url}&agent_id={agent_id}&conference_name={conference_name}&mute={participant['muted']}",
+                    # method="POST",
+                    # status_callback=webhook_url,
+                    # status_callback_method="POST",
+                    # status_callback_event=["completed"],
+                )
+                print(f"Call initiated for {participant['phone']} with SID {call.sid}")
+
+        # Save call details to Redis or another storage mechanism
+        await redis_client.set(user_id, json.dumps(call_details))
+        await close_redis_connection()
+
+        return PlainTextResponse("Conference call initiated successfully", status_code=200)
+
+    except Exception as e:
+        logging.error(f"Exception occurred in make_conference_call: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+@app.post('/twilio_callback_conference')
+async def twilio_callback_conference(ws_url: str = Query(...), agent_id: str = Query(...), conference_name: str = Query(...), mute: str = Query(...)):
+    try:
+        response = VoiceResponse()
+        dial = Dial()
+
+        mute = mute.lower() == 'true'
+        dial.conference(conference_name, muted=mute)
+        websocket_twilio_route = f'{ws_url}/chat/v1/{agent_id}'
+
+        # Connect AI agent to the conference using the stream URL
+        connect = Connect()
+        stream = Stream(url=websocket_twilio_route)
+        connect.append(stream)
+        response.append(connect)
+
+        return PlainTextResponse(str(response), status_code=200, media_type='application/xml')
+
+    except Exception as e:
+        print(f"Exception occurred in twilio_callback_conference: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
