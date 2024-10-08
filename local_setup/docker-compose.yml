@@ -11,6 +11,8 @@ services:
       - redis
     env_file:
       - .env
+    volumes:
+      - ./telephony_server:/app
 
   bolna-app:
     image: bolna-app:latest
@@ -27,6 +29,7 @@ services:
       - ../agent_data:/app/agent_data
       - $HOME/.aws/credentials:/root/.aws/credentials:ro
       - $HOME/.aws/config:/root/.aws/config:ro
+      - ../bolna:/app/bolna
 
   redis:
     image: redis:latest
