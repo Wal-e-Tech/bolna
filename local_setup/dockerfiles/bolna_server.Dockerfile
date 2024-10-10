@@ -6,6 +6,8 @@ COPY ./quickstart_server.py /app
 
 RUN apt-get update && apt-get install libgomp1 git -y
 RUN apt-get -y update && apt-get -y upgrade && apt-get install -y --no-install-recommends ffmpeg
+RUN apt-get install -y build-essential
+RUN apt-get install gcc
 RUN pip install -r requirements.txt
 RUN pip install --force-reinstall git+https://github.com/bolna-ai/bolna@master
 RUN pip install scipy==1.11.0

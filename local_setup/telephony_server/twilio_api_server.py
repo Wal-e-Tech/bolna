@@ -52,7 +52,9 @@ async def make_call(request: Request):
             raise HTTPException(status_code=404, detail="Recipient phone number not provided")
 
         app_callback_url, websocket_url = populate_ngrok_tunnels()
-
+        webhook_url = call_details['webhook_url'] if 'webhook_url' in call_details else ''
+        
+        print(f'webhook_url : {webhook_url}')
         print(f'app_callback_url: {app_callback_url}')
         print(f'websocket_url: {websocket_url}')
 
@@ -61,7 +63,10 @@ async def make_call(request: Request):
             from_=twilio_phone_number,
             url=f"{app_callback_url}/twilio_callback?ws_url={websocket_url}&agent_id={agent_id}",
             method="POST",
-            record=False
+            record=False,
+            status_callback=webhook_url,
+            status_callback_method='POST',
+            status_callback_event=['completed'],
         )
 
         return PlainTextResponse("done", status_code=200)

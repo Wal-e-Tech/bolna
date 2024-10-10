@@ -48,15 +48,10 @@ async def create_agent(agent_data: CreateAgentPayload):
         logger.info("Setting up follow up tasks")
         for index, task in enumerate(data_for_db['tasks']):
             if task['task_type'] == "extraction":
-                extraction_prompt_llm = os.getenv("EXTRACTION_PROMPT_GENERATION_MODEL")
-                extraction_prompt_generation_llm = LiteLLM(model=extraction_prompt_llm, max_tokens=2000)
-                extraction_prompt = await extraction_prompt_generation_llm.generate(
-                    messages=[
-                        {'role': 'system', 'content': EXTRACTION_PROMPT_GENERATION_PROMPT},
-                        {'role': 'user', 'content': data_for_db["tasks"][index]['tools_config']["llm_agent"]['extraction_details']}
-                    ])
+                extraction_prompt = agent_prompts.get(f"task_{index + 1}", {}).get("system_prompt")
+                logger.info(f"extraction_prompt = {extraction_prompt}")
                 data_for_db["tasks"][index]["tools_config"]["llm_agent"]['extraction_json'] = extraction_prompt
-
+                
     stored_prompt_file_path = f"{agent_uuid}/conversation_details.json"
     await asyncio.gather(
         redis_client.set(agent_uuid, json.dumps(data_for_db)),

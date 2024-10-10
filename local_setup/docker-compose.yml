@@ -16,6 +16,8 @@ services:
       - ../agent_data:/app/agent_data
       - $HOME/.aws/credentials:/root/.aws/credentials:ro
       - $HOME/.aws/config:/root/.aws/config:ro
+      - ../bolna:/app/bolna
+      - ./quickstart_server.py:/app/quickstart_server.py
 
   # redis service used as a persistent storage
   redis:
@@ -49,6 +51,8 @@ services:
       - redis
     env_file:
       - .env
+    volumes:
+      - ./telephony_server:/app
 
   plivo-app:
     image: plivo-app:latest
